@@ -11,15 +11,101 @@ function shuffled(items, random = Math.random) {
 }
 
 let currentAccent = localStorage.getItem('ielts_voice_accent') === 'en-US' ? 'en-US' : 'en-GB';
-let speechMessageTimer;
-function speechNotice(message) {
-    byId('speech-status').textContent = message;
-    clearTimeout(speechMessageTimer);
-    speechMessageTimer = setTimeout(() => byId('speech-status').textContent = '', 7500);
+
+let currentTutor = 'nyx';
+let speechRequest = 0;
+let playingClip;
+let voiceContext;
+let playingBuffer;
+
+function displayTutor(input) {
+    const card = input.closest('.tutor-card');
+    if (currentTutor !== input.value) stopTutorSpeech();
+    currentTutor = input.value;
+    const name = card.querySelector('strong').textContent;
+    byId('hear-tutor').textContent = 'Hear ' + name;
+    byId('tutor-note-name').textContent = name;
+    byId('tutor-note-text').textContent = '“' + TUTOR_LINES[currentTutor].greeting.join(' ') + '”';
+    byId('current-tutor-photo').src = card.querySelector('img').src;
+    const label = 'Change tutor (currently ' + name + ')';
+    byId('current-tutor').setAttribute('aria-label', label);
+    byId('current-tutor').title = label;
+    refreshTutorFeedback();
 }
+
+function initTutorPicker() {
+    const gallery = document.querySelector('.tutor-gallery');
+    const savedTutor = localStorage.getItem('ielts_study_tutor');
+    const inputs = Array.from(gallery.querySelectorAll('input'));
+    const selected = inputs.find(input => input.value === savedTutor) || inputs[0];
+    const praiseOption = byId('personal-praise');
+    praiseOption.checked = localStorage.getItem('ielts_personal_praise') === 'true';
+    praiseOption.addEventListener('change', () => {
+        localStorage.setItem('ielts_personal_praise', String(praiseOption.checked));
+        stopTutorSpeech();
+        refreshTutorFeedback();
+    });
+    selected.checked = true;
+    displayTutor(selected);
+    gallery.addEventListener('change', event => {
+        const input = event.target;
+        localStorage.setItem('ielts_study_tutor', input.value);
+        displayTutor(input);
+    });
+}
+
+function openTutorPicker() {
+    switchTab('dashboard');
+    document.querySelector('.tutor-card input:checked').focus();
+}
+
+function speakTutorLine(cue) {
+    const text = TUTOR_LINES[currentTutor][cue].join(' ');
+    return speakText(text, cue === 'greeting' ? 'greeting' : 'coach-' + cue);
+}
+
+function setTutorFeedback(panel, result) {
+    panel.hidden = !result;
+    if (!result) {
+        delete panel.dataset.result;
+        return;
+    }
+    panel.dataset.result = result;
+    const cue = result === 'correct' && byId('personal-praise').checked ? 'personal' : result;
+    if (!panel.firstElementChild) panel.append(byId('tutor-feedback-template').content.cloneNode(true));
+    panel.querySelector('.feedback-name').textContent = byId('tutor-note-name').textContent;
+    panel.querySelector('.feedback-line').textContent = '“' + TUTOR_LINES[currentTutor][cue].join(' ') + '”';
+    panel.querySelector('button').onclick = () => speakTutorLine(cue);
+}
+
+function refreshTutorFeedback() {
+    document.querySelectorAll('.tutor-feedback[data-result]').forEach(panel => {
+        setTutorFeedback(panel, panel.dataset.result);
+    });
+}
+
+function stopTutorSpeech() {
+    speechRequest++;
+    window.tutorTTS?.cancel();
+    if (playingClip) {
+        playingClip.onerror = null;
+        playingClip.pause();
+        playingClip.removeAttribute('src');
+        playingClip.load();
+        playingClip = null;
+    }
+    if (playingBuffer) {
+        playingBuffer.onended = null;
+        playingBuffer.stop();
+        playingBuffer.disconnect();
+        playingBuffer = null;
+    }
+    byId('speech-status').textContent = '';
+}
+
 function setAccent(accent) {
     currentAccent = accent;
-    window.speechSynthesis?.cancel();
+    stopTutorSpeech();
     localStorage.setItem('ielts_voice_accent', accent);
     updateAccentToggleUI();
     renderVocabList();
@@ -35,30 +121,53 @@ function phonetics(item) {
     if (!item.ipaUS) return item.ipa || '';
     return currentAccent === 'en-US' ? 'US ' + item.ipaUS : 'UK ' + item.ipa;
 }
-function speakText(text) {
+// The catalogue contains the exact text used to render each bundled recording.
+async function speakText(text, assignedClip) {
     if (typeof text !== 'string' || !text.trim()) return;
-    const synth = window.speechSynthesis;
-    if (!synth || !window.SpeechSynthesisUtterance) {
-        speechNotice('This browser has no speech playback. Cambridge Dictionary has recorded word pronunciations.');
-        return;
-    }
     const spoken = text.replace(/\[\s*_+\s*\]/g, 'blank').trim();
-    if (!spoken) return;
-    synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(spoken);
-    utterance.lang = currentAccent;
-    utterance.rate = 0.92;
-    const voices = synth.getVoices();
-    const lang = v => v.lang.toLowerCase().replaceAll('_', '-');
-    const exact = voices.find(v => lang(v) === currentAccent.toLowerCase());
-    const voice = exact || voices.find(v => /^en(?:-|$)/.test(lang(v)));
-    if (voice) utterance.voice = voice;
-    if (!exact && voice) speechNotice('Using the available ' + voice.lang + ' voice on this device.');
-    else byId('speech-status').textContent = '';
-    utterance.onerror = e => {
-        if (!['interrupted', 'canceled'].includes(e.error)) speechNotice('Playback failed. Check your device’s English voices or open Cambridge audio.');
-    };
-    synth.speak(utterance);
+    stopTutorSpeech();
+    const request = speechRequest;
+    const isCurrent = () => request === speechRequest;
+    const status = message => { if (isCurrent()) byId('speech-status').textContent = message; };
+    const accent = currentAccent === 'en-US' ? 'us' : 'uk';
+    const clip = assignedClip || TUTOR_AUDIO_CLIPS.get(spoken);
+    try {
+        if (clip) {
+            playingClip = new Audio('assets/tutor-audio/' + currentTutor + '/' + accent + '/' + clip + '.mp3');
+            playingClip.onerror = () => status('This recording could not be played. Tap Listen to retry.');
+            await playingClip.play();
+            return;
+        }
+
+        // Unlock the audio output during the tap, before the voice engine's first download.
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error('Custom pronunciation needs a browser with Web Audio support.');
+        voiceContext ||= new AudioContextClass();
+        if (voiceContext.state !== 'running') await voiceContext.resume();
+        if (!isCurrent()) return;
+        const profile = tutorVoices[currentTutor];
+        status('Preparing your tutor’s voice…');
+        const blob = await window.tutorTTS.synthesize(spoken, {
+            voice: profile[accent], speed: profile.speed, onStatus: status, isCurrent
+        });
+        if (!isCurrent()) return;
+        const audio = await voiceContext.decodeAudioData(await blob.arrayBuffer());
+        if (!isCurrent()) return;
+        const source = voiceContext.createBufferSource();
+        source.buffer = audio;
+        source.connect(voiceContext.destination);
+        source.onended = () => {
+            source.disconnect();
+            if (playingBuffer === source) playingBuffer = null;
+        };
+        playingBuffer = source;
+        source.start();
+        status('');
+    } catch (error) {
+        if (!isCurrent() || error.name === 'AbortError') return;
+        if (clip) status('This recording could not be played. Tap Listen to retry.');
+        else status('Custom pronunciation could not start. The first use needs internet access. Tap Listen to retry.');
+    }
 }
 function speakTargetWord() {
     const card = appState.srsReviewQueue[appState.currentSrsIndex];
@@ -157,6 +266,7 @@ function openDailyReading() {
 function switchTab(tabId) {
     refreshDay();
     const old = appState.activeTab;
+    if (tabId !== old) stopTutorSpeech();
     if (old === 'reading' && tabId !== old && appState.reading.timerInterval) toggleTimer();
     appState.activeTab = tabId;
     document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -194,6 +304,7 @@ function renderPassageSelector() {
     sel.value = appState.reading.currentPassageId || todays(appState.passages).id;
 }
 function loadPassage(id) {
+    stopTutorSpeech();
     clearInterval(appState.reading.timerInterval);
     const p = appState.passages.find(x => x.id === id) || todays(appState.passages);
     const r = appState.reading = {currentPassageId:p.id, day:appState.activeDay, questions:shuffled(p.questions), userAnswers:{}, isSubmitted:false, timerSeconds:1200, timerInterval:null};
@@ -222,6 +333,7 @@ function loadPassage(id) {
         list.append(field);
     }
     byId('explanations-panel').classList.add('hidden');
+    setTutorFeedback(byId('reading-coach'), null);
     byId('question-score-badge').textContent = 'In progress';
     byId('submit-reading').disabled = false;
     byId('retry-reading').hidden = true;
@@ -272,6 +384,7 @@ function submitReadingTest() {
           <p>Paragraph ${q.evidenceParagraph}: “${escapeHtml(q.quote)}” ${escapeHtml(q.explanation)}</p></div>`;
     }).join('');
     byId('explanations-panel').classList.remove('hidden');
+    setTutorFeedback(byId('reading-coach'), score === r.questions.length ? 'readingPerfect' : 'readingReview');
     appState.stats.passagesCompletedToday++;
     appState.stats.totalStudyMinutesToday += Math.round((1200 - r.timerSeconds) / 60);
     saveState();
@@ -512,19 +625,28 @@ function startSrsReview() {
     appState.srsReviewQueue = [...pool.slice(first), ...pool.slice(0,first)].slice(0,15);
     appState.currentSrsIndex = 0;
     switchTab('vocab');
+    byId('srs-completion').hidden = true;
+    setTutorFeedback(byId('deck-coach'), null);
     document.getElementById('srs-review-card-area').classList.remove('hidden');
     showCurrentSrsCard();
 }
 
 function closeSrsReview() {
+    stopTutorSpeech();
     document.getElementById('srs-review-card-area').classList.add('hidden');
 }
 
 function showCurrentSrsCard() {
+    stopTutorSpeech();
     const card = appState.srsReviewQueue[appState.currentSrsIndex];
     if (!card) {
-        alert("Splendid work! You completed today's SRS review batch.");
         closeSrsReview();
+        const count = appState.srsReviewQueue.length;
+        const title = byId('srs-completion-title');
+        title.textContent = 'Review complete · ' + count + (count === 1 ? ' card' : ' cards');
+        setTutorFeedback(byId('deck-coach'), 'deckDone');
+        byId('srs-completion').hidden = false;
+        title.focus();
         updateDashboardMetrics();
         return;
     }
@@ -617,7 +739,7 @@ function renderBritishPhrases(filter = 'ALL') {
                     </button>
                 </div>
                 <div class="flex items-center space-x-1.5">
-                    ${isToday ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-600 text-white uppercase">Notebook pick</span>' : ''}
+                    ${isToday ? '<span class="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-600 text-white uppercase">Today’s pick</span>' : ''}
                     <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase ${b.category === 'ACADEMIC' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}">${b.tone}</span>
                 </div>
             </div>
@@ -723,7 +845,11 @@ function speakBlankQuestion() {
 }
 
 function renderFillBlankQuiz() {
-    if (dailyBlankQuestions.length === 0) return;
+    stopTutorSpeech();
+    if (dailyBlankQuestions.length === 0) {
+        setTutorFeedback(byId('quiz-coach'), null);
+        return;
+    }
     const q = dailyBlankQuestions[currentBlankIdx];
     document.getElementById('blank-q-num').innerText = currentBlankIdx + 1;
     document.getElementById('blank-q-total').innerText = dailyBlankQuestions.length;
@@ -760,8 +886,10 @@ function renderFillBlankQuiz() {
             <div>${escapeHtml(q.explanation)}</div>
         `;
         fb.classList.remove('hidden');
+        setTutorFeedback(byId('quiz-coach'), q.isCorrect ? 'correct' : 'retry');
     } else {
         fb.classList.add('hidden');
+        setTutorFeedback(byId('quiz-coach'), null);
     }
 }
 
@@ -879,6 +1007,7 @@ function checkSentenceBuilder() {
 }
 
 function switchQuizMode(mode) {
+    stopTutorSpeech();
     if (mode === 'fill-blank') {
         document.getElementById('quiz-blank-section').classList.remove('hidden');
         document.getElementById('quiz-builder-section').classList.add('hidden');
@@ -980,7 +1109,8 @@ function uploadToCloud() {
         vocab: appState.vocab,
         stats: appState.stats,
         activeDay: appState.activeDay,
-        accent: currentAccent
+        accent: currentAccent,
+        tutor: currentTutor
     };
 
     const btn = document.getElementById('btn-push-cloud');
@@ -1064,6 +1194,12 @@ function applyRestoredCloudState(data, keyUsed) {
     appState.srsReviewQueue = [];
     closeSrsReview();
     if (['en-GB','en-US'].includes(data.accent)) setAccent(data.accent);
+    if (Object.hasOwn(tutorVoices, data.tutor)) {
+        const input = document.querySelector('input[name="study-tutor"][value="' + data.tutor + '"]');
+        input.checked = true;
+        localStorage.setItem('ielts_study_tutor', data.tutor);
+        displayTutor(input);
+    }
     localStorage.setItem('ielts_cloud_sync_key', keyUsed);
     saveState();
     clearInterval(appState.reading.timerInterval);
@@ -1082,13 +1218,14 @@ function exportBackupFile() {
         vocab: appState.vocab,
         stats: appState.stats,
         activeDay: appState.activeDay,
-        accent: currentAccent
+        accent: currentAccent,
+        tutor: currentTutor
     };
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ielts_academic_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `the_alternative_way_of_learning_ielts_backup_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1183,8 +1320,8 @@ document.addEventListener('keydown', (e) => {
 
 
 window.addEventListener('DOMContentLoaded', () => {
+    initTutorPicker();
     updateAccentToggleUI();
-    window.speechSynthesis?.getVoices();
     updateDashboardMetrics();
     scheduleMidnight();
     refreshPublisherLessons();

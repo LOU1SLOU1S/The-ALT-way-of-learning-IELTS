@@ -1,0 +1,96 @@
+/* The lesson views share a palette with the study desk. These selectors also
+   cover the cards and feedback inserted when a learner answers a question. */
+:is(#tab-reading, #tab-vocab, #tab-british, #tab-practice, #modal-cloud-sync, #modal-add-word, #dict-popup) {
+    --lesson-text: #f3eaf0;
+    --lesson-body: #d7ccd5;
+    --lesson-muted: #b7a9b7;
+    --lesson-card: #211d25;
+    --lesson-inset: #19161d;
+    --lesson-control: #302a34;
+    --lesson-line: #443b49;
+    --lesson-accent: #efb5c8;
+    --lesson-pressed: #462f3d;
+    color: var(--lesson-text);
+    color-scheme: dark;
+
+    & .bg-white { background-color: var(--lesson-card); }
+    & :is(.bg-slate-50, .bg-slate-900, .bg-slate-900\/50) { background-color: var(--lesson-inset); }
+    & :is(.bg-slate-100, .bg-slate-200, .bg-slate-700, .bg-slate-800\/80) { background-color: var(--lesson-control); }
+    & :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-slate-700, .border-slate-700\/60, .border-slate-800) { border-color: var(--lesson-line); }
+
+    & :is(.text-slate-800, .text-slate-900, .text-white) { color: var(--lesson-text); }
+    & :is(.text-slate-200, .text-slate-300, .text-slate-600, .text-slate-700, .text-blue-200) { color: var(--lesson-body); }
+    & :is(.text-slate-400, .text-slate-500) { color: var(--lesson-muted); }
+    & :is(.text-indigo-200, .text-indigo-300, .text-indigo-400, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900, .text-sky-700, .text-blue-300, .text-rose-300, .text-rose-400, .text-rose-600) { color: var(--lesson-accent); }
+    & :is(.bg-indigo-50, .bg-indigo-50\/80, .bg-indigo-100, .bg-indigo-900\/50, .bg-blue-500\/20, .bg-sky-100, .bg-rose-500\/20) { background-color: var(--lesson-pressed); }
+    & :is(.border-indigo-100, .border-indigo-200, .border-indigo-400, .border-indigo-700\/50, .border-blue-400\/30, .border-rose-500\/30) { border-color: #715062; }
+    & :is(.bg-indigo-600, .bg-rose-600, .bg-sky-600) { background-color: var(--lesson-accent); color: #281b24; }
+    & .fill-white { fill: currentColor; }
+
+    & :is(.bg-emerald-50, .bg-emerald-100) { color: #c5edda; background-color: #22382f; border-color: #568672; }
+    & :is(.bg-rose-50, .bg-rose-100) { color: #ffceda; background-color: #462834; border-color: #9a596d; }
+    & .bg-amber-100 { color: #f5d3a2; background-color: #413326; }
+    & :is(.text-emerald-300, .text-emerald-600) { color: #a6dabe; }
+
+    & :is(input, textarea)::placeholder { color: var(--lesson-muted); opacity: 1; }
+    & :is(input, select, textarea, button, a):focus-visible {
+        outline: 2px solid var(--lesson-accent);
+        outline-offset: 3px;
+    }
+    & :is(input:not([type="radio"]), select, textarea):focus { border-color: var(--lesson-accent); }
+    & button:not(:disabled):hover { filter: brightness(1.15); }
+    & button.bg-white:not(:disabled):hover { background-color: var(--lesson-control); border-color: #88697e; }
+    & .source-reading { background: var(--lesson-card); border-color: #a4738a; color: var(--lesson-body); }
+    & .source-reading a { color: var(--lesson-accent); }
+}
+
+#tab-reading #passage-text { color: var(--lesson-body); }
+#tab-reading #passage-text strong { color: var(--lesson-accent); }
+#tab-reading #passage-text :is(.highlight-yellow, .highlight-green, .highlight-pink),
+#tab-reading #passage-text :is(.highlight-yellow, .highlight-green, .highlight-pink) * { color: #231c25; }
+#questions-list input { accent-color: var(--lesson-accent); }
+#questions-list label:has(input:checked) {
+    background: var(--lesson-pressed);
+    border-color: var(--lesson-accent);
+    box-shadow: inset 3px 0 var(--lesson-accent);
+}
+#questions-list label:has(input:focus-visible) { outline: 2px solid var(--lesson-accent); outline-offset: 2px; }
+
+#srs-review-card-area, #tab-british > .bg-gradient-to-r {
+    background: linear-gradient(115deg, #332632, #211d27 65%, #2b212d);
+    border-color: #53404f;
+}
+#srs-card-answer { color: var(--lesson-body); }
+#srs-rating-buttons button { border-color: currentColor; }
+#srs-rating-buttons .bg-rose-600\/80 { background: #462834; color: #ffceda; }
+#srs-rating-buttons .bg-amber-600\/80 { background: #413326; color: #f5d3a2; }
+#srs-rating-buttons .bg-indigo-600\/80 { background: #383044; color: #e5c8ef; }
+#srs-rating-buttons .bg-emerald-600\/80 { background: #22382f; color: #c5edda; }
+
+#tab-british [data-phrase-filter] { background: var(--lesson-control); border: 1px solid var(--lesson-line); }
+#tab-british [data-phrase-filter][aria-pressed="true"] {
+    background: var(--lesson-pressed);
+    color: var(--lesson-accent);
+    border-color: var(--lesson-accent);
+}
+#british-cards-container .ring-rose-100 { --tw-ring-color: #755166; border-color: #ad7d92; }
+#quiz-nav-pills .ring-indigo-300 { --tw-ring-color: #7c566a; }
+#tab-british > div:first-child h2, #tab-practice > div:first-child h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.55rem, 3vw, 2.2rem);
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -.03em;
+}
+
+#modal-add-word, #modal-cloud-sync { background: rgb(9 7 12 / 78%); }
+#dict-popup { background: #28212b; border-color: #876578; }
+
+@media (max-width: 640px) {
+    #srs-review-card-area { padding: 1rem; }
+    #srs-review-card-area .items-baseline, #tab-practice .items-center:has(> #quiz-day-badge) {
+        flex-wrap: wrap;
+        gap: .5rem;
+    }
+    #tab-british .flex:has(> [data-phrase-filter]) { flex-wrap: wrap; }
+}

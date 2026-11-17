@@ -11,7 +11,7 @@ function app() {
         document: {addEventListener() {}}, window: {addEventListener() {}}
     });
     const run = source => vm.runInContext(source,context);
-    for (const file of ['curriculum.js','app.js']) run(fs.readFileSync(path.join(__dirname,'..',file),'utf8'));
+    for (const file of ['curriculum.js', 'assets/tutor-audio/catalog.js', 'assets/tutor-lines.js', 'app.js']) run(fs.readFileSync(path.join(__dirname,'..',file),'utf8'));
     return run;
 }
 
@@ -80,13 +80,61 @@ test('daily publisher selection features releases, rotates the archive and skips
     assert.equal(run('dailyEpisode(releases,new Date(2026,4,1))'),null);
 });
 
-test('speech keeps word boundaries and punctuation and chooses the exact accent first', () => {
+test('every curriculum utterance and scripted tutor cue has both accent recordings', () => {
     const run = app();
-    run(`document.getElementById = () => ({});
-        let spoken;
-        window.SpeechSynthesisUtterance = globalThis.SpeechSynthesisUtterance = class {constructor(text){ this.text = text; }};
-        window.speechSynthesis = {cancel(){},getVoices:()=>[{lang:'en-US'},{lang:'en_GB'}],speak:u=>{spoken=u}};
-        speakText("It’s a [ _____ ] day — shall we go?")`);
-    assert.equal(run('spoken.text'),'It’s a blank day — shall we go?');
-    assert.equal(run('spoken.voice.lang'),'en_GB');
+    const expected = run(`[
+        ...RAW_VOCABULARY_DB.flatMap(w => [w.word, w.example, w.example.replace(w.word, 'blank')]),
+        ...RAW_BRITISH_DB.flatMap(b => [b.phrase, b.example])
+    ]`);
+    const catalog = run('TUTOR_AUDIO_CLIPS');
+    assert.deepEqual(new Set(catalog.keys()), new Set(expected));
+    const tutors = run('Object.keys(tutorVoices)');
+    for (const tutor of tutors) {
+        const lines = run('TUTOR_LINES')[tutor];
+        const coachFiles = Object.keys(lines).map(cue => cue === 'greeting' ? cue : 'coach-' + cue);
+        for (const accent of ['uk', 'us']) {
+            const dir = path.join(__dirname, '..', 'assets', 'tutor-audio', tutor, accent);
+            for (const stem of [...catalog.values(), ...coachFiles]) {
+                assert.ok(fs.statSync(path.join(dir, stem + '.mp3')).size > 1024, stem);
+            }
+        }
+    }
+});
+
+test('the selected tutor and accent apply to bundled and custom speech', async () => {
+    const run = app();
+    run(`
+        let played, generated;
+        document.getElementById = () => ({});
+        globalThis.Audio = class {
+            constructor(url) { this.url = url; }
+            play() { played = this.url; }
+            pause() {}
+            removeAttribute() {}
+            load() {}
+        };
+        window.AudioContext = class {
+            state = 'running';
+            async decodeAudioData() { return {}; }
+            createBufferSource() { return {connect() {}, start() {}, disconnect() {}, stop() {}}; }
+        };
+        window.tutorTTS = {
+            cancel() {},
+            async synthesize(text, {voice, speed}) {
+                generated = {text, voice, speed};
+                return { async arrayBuffer() { return new ArrayBuffer(0); } };
+            }
+        };
+    `);
+    for (const tutor of ['nyx', 'roxy', 'selene', 'ivy']) {
+        for (const [locale, accent] of [['en-US', 'us'], ['en-GB', 'uk']]) {
+            run(`currentTutor = '${tutor}'; currentAccent = '${locale}'`);
+            await run("speakText('mitigate')");
+            assert.equal(run('played'), 'assets/tutor-audio/' + tutor + '/' + accent + '/w1-word.mp3');
+            await run("speakText('It’s a [ _____ ] day — shall we go?')");
+            assert.equal(run('generated.text'), 'It’s a blank day — shall we go?');
+            assert.equal(run('generated.voice'), run(`tutorVoices[currentTutor]['${accent}']`));
+            assert.equal(run('generated.speed'), run('tutorVoices[currentTutor].speed'));
+        }
+    }
 });

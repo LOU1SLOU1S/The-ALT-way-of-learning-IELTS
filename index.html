@@ -3,17 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IELTS Notebook · Daily English practice</title>
-    <meta name="description" content="A daily study desk for IELTS reading, vocabulary, conversation and listening practice.">
+    <title>The Alternative Way of learning IELTS</title>
+    <meta name="application-name" content="The Alternative Way of learning IELTS">
+    <meta name="description" content="Choose your tutor in The Alternative Way of learning IELTS and practise reading, vocabulary, conversation and listening each day.">
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="assets/utilities.css">
     <link rel="stylesheet" href="notebook.css">
+    <link rel="stylesheet" href="assets/lesson-theme.css">
 </head>
 <body class="antialiased min-h-screen">
     <a class="skip" href="#workspace">Skip to practice</a>
     <header class="masthead">
       <div class="mast-inner">
-        <button class="brand" onclick="switchTab('dashboard')" aria-label="IELTS Notebook home"><span class="brand-icon"><i data-lucide="book-open"></i></span>IELTS <em>Notebook</em></button>
+        <button class="brand" onclick="switchTab('dashboard')" aria-label="The Alternative Way of learning IELTS home">
+          <span class="brand-moon" aria-hidden="true">☾</span>
+          <span class="brand-name">The Alternative Way <em>of learning IELTS</em></span>
+        </button>
         <nav aria-label="Study sections" class="desk-nav">
           <button data-tab="dashboard" aria-current="page" onclick="switchTab('dashboard')">Overview</button>
           <button data-tab="reading" onclick="switchTab('reading')">Reading</button>
@@ -22,6 +27,7 @@
           <button data-tab="practice" onclick="switchTab('practice')">Quizzes</button>
         </nav>
         <div class="desk-tools">
+          <button id="current-tutor" class="current-tutor" type="button" aria-label="Change tutor" onclick="openTutorPicker()"><img id="current-tutor-photo" src="assets/tutors/nyx.webp" width="34" height="34" alt=""></button>
           <div class="accent-switch" role="group" aria-label="Pronunciation accent">
             <button id="btn-accent-gb" onclick="setAccent('en-GB')" aria-label="British English pronunciation">UK</button>
             <button id="btn-accent-us" onclick="setAccent('en-US')" aria-label="American English pronunciation">US</button>
@@ -32,17 +38,49 @@
     </header>
     <main id="workspace" class="desk-main">
       <section id="tab-dashboard">
-        <div class="desk-heading"><h1>Your study desk</h1><div class="desk-date"><i data-lucide="calendar-days"></i><span id="desk-date"></span><span id="desk-day"></span></div></div>
+        <div class="desk-heading"><h1 id="tutor-heading">Choose your <em>tutor.</em></h1><div class="desk-date"><i data-lucide="calendar-days"></i><span id="desk-date"></span><span id="desk-day"></span></div></div>
+        <fieldset class="tutor-gallery" aria-labelledby="tutor-heading">
+          <label class="tutor-card">
+            <input type="radio" name="study-tutor" value="nyx" checked>
+            <img src="assets/tutors/nyx.webp" alt="" width="1024" height="1024" fetchpriority="high">
+            <span class="tutor-indicator" aria-hidden="true">✓</span>
+            <span class="tutor-caption"><strong>Nyx</strong><span>Soft &amp; encouraging</span></span>
+          </label>
+          <label class="tutor-card">
+            <input type="radio" name="study-tutor" value="roxy">
+            <img src="assets/tutors/roxy.webp" alt="" width="1024" height="1024">
+            <span class="tutor-indicator" aria-hidden="true">✓</span>
+            <span class="tutor-caption"><strong>Roxy</strong><span>Playful &amp; quick-witted</span></span>
+          </label>
+          <label class="tutor-card">
+            <input type="radio" name="study-tutor" value="selene">
+            <img src="assets/tutors/selene.webp" alt="" width="936" height="1024">
+            <span class="tutor-indicator" aria-hidden="true">✓</span>
+            <span class="tutor-caption"><strong>Selene</strong><span>Commanding &amp; precise</span></span>
+          </label>
+          <label class="tutor-card">
+            <input type="radio" name="study-tutor" value="ivy">
+            <img src="assets/tutors/ivy.webp" alt="" width="1024" height="1024">
+            <span class="tutor-indicator" aria-hidden="true">✓</span>
+            <span class="tutor-caption"><strong>Ivy</strong><span>Warm &amp; reassuring</span></span>
+          </label>
+        </fieldset>
+        <div class="tutor-greeting">
+          <p class="tutor-note" aria-live="polite" aria-atomic="true"><span aria-hidden="true">✦</span><strong id="tutor-note-name">Nyx</strong><span id="tutor-note-text">“Oh, there you are. Pull up a chair. Give me one word, and we’ll start there.”</span></p>
+          <div class="tutor-preferences">
+            <button id="hear-tutor" class="hear-tutor" type="button" onclick="speakTutorLine('greeting')">Hear Nyx</button>
+            <label class="praise-option"><input type="checkbox" id="personal-praise"> Use “good boy” praise</label>
+          </div>
+        </div>
+        <div class="section-heading"><h2>Today’s practice</h2><span>Refreshes at local midnight</span></div>
         <article class="feature">
           <div class="feature-copy">
             <div class="feature-label"><i data-lucide="book-open"></i> Today’s reading</div>
             <h2 id="dash-passage-title"></h2>
             <p id="dash-passage-intro"></p>
-            <div class="feature-actions"><button class="read-button" onclick="openDailyReading()">Start reading <i data-lucide="arrow-right"></i></button><span id="dash-passage-size"></span></div>
           </div>
-          <div class="feature-photo"><img src="assets/study-desk.webp" alt="" width="1050" height="700"></div>
+          <div class="feature-actions"><button class="read-button" onclick="openDailyReading()">Start reading <i data-lucide="arrow-right"></i></button><span id="dash-passage-size"></span></div>
         </article>
-        <div class="section-heading"><h2>Today’s practice</h2><span>Refreshes at local midnight</span></div>
         <div class="practice-grid">
           <article class="practice-card"><span class="card-icon sage"><i data-lucide="layers"></i></span><h3>Word of the day</h3><strong class="focus-word" id="desk-focus-word"></strong><p id="desk-vocab"></p><button onclick="startSrsReview()">Review flashcards <i data-lucide="arrow-right"></i></button></article>
           <article class="practice-card"><span class="card-icon apricot"><i data-lucide="messages-square"></i></span><h3>Phrase of the day</h3><p id="desk-phrase"></p><button onclick="switchTab('british')">Practise conversation <i data-lucide="arrow-right"></i></button></article>
@@ -117,6 +155,7 @@
                         </div>
                         <div id="questions-list" class="space-y-6">
                         </div>
+                        <div id="reading-coach" class="tutor-feedback" hidden></div>
                         <div id="explanations-panel" class="hidden p-4 bg-indigo-50/80 border border-indigo-200 rounded-xl space-y-3">
                             <div class="flex items-center space-x-2 text-indigo-900 font-bold text-sm">
                                 <i data-lucide="help-circle" class="w-4 h-4 text-indigo-600"></i>
@@ -240,6 +279,10 @@
                     </div>
                 </div>
             </div>
+            <section id="srs-completion" hidden>
+                <h2 id="srs-completion-title" tabindex="-1"></h2>
+                <div id="deck-coach" class="tutor-feedback" hidden></div>
+            </section>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="vocab-card-grid">
             </div>
         </section>
@@ -307,6 +350,7 @@
                         </div>
                     </div>
                     <div aria-live="polite" id="blank-feedback" class="hidden p-4 rounded-xl text-xs space-y-1.5"></div>
+                    <div id="quiz-coach" class="tutor-feedback" hidden></div>
                     <div class="flex items-center justify-between pt-2">
                         <button id="prev-blank" onclick="prevBlankQuestion()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center space-x-1">
                             <i data-lucide="chevron-left" class="w-4 h-4"></i>
@@ -503,9 +547,16 @@
             <span>Add to Vocabulary Deck</span>
         </button>
     </div>
+    <template id="tutor-feedback-template">
+        <p><strong class="feedback-name"></strong> <span class="feedback-line"></span></p>
+        <button type="button" class="hear-tutor">Hear feedback</button>
+    </template>
     <p id="speech-status" role="status" aria-live="polite"></p>
     <script src="assets/icons.js"></script>
     <script src="curriculum.js"></script>
+    <script src="assets/tutor-lines.js"></script>
+    <script src="assets/tutor-audio/catalog.js"></script>
+    <script src="assets/tutor-tts.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
